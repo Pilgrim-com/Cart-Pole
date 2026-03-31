@@ -422,6 +422,7 @@ class A2C(OnPolicyAlgorithm):
         else:
             # try pulling observation shape by doing a fast reset
             obs, _ = env.reset()
+            if isinstance(obs, dict): obs = obs.get("policy", next(iter(obs.values())))
             obs_shape = obs.shape[1:]
             
         self._init_storage(
@@ -436,6 +437,7 @@ class A2C(OnPolicyAlgorithm):
         # ===== Reset environment ===== #
         # ========= put your code here ========= #
         obs, _ = env.reset()
+        if isinstance(obs, dict): obs = obs.get("policy", next(iter(obs.values())))
         if not isinstance(obs, torch.Tensor):
             obs = torch.tensor(obs, dtype=torch.float32, device=self.device)
         # ====================================== #
@@ -458,6 +460,7 @@ class A2C(OnPolicyAlgorithm):
                         env_action = action
                         
                     next_obs, rewards, terminated, truncated, _ = env.step(env_action)
+                    if isinstance(next_obs, dict): next_obs = next_obs.get("policy", next(iter(next_obs.values())))
                     dones = terminated | truncated
                     
                     if not isinstance(next_obs, torch.Tensor):

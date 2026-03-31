@@ -232,6 +232,7 @@ class AC(OnPolicyAlgorithm):
         """
         # ========= put your code here ========= #
         obs, _ = env.reset()
+        if isinstance(obs, dict): obs = obs.get("policy", next(iter(obs.values())))
         if isinstance(obs, torch.Tensor):
             obs_np = obs.squeeze().cpu().numpy()
         else:
@@ -269,6 +270,7 @@ class AC(OnPolicyAlgorithm):
                 
             env_action = scaled_a.unsqueeze(0).to(device)
             next_obs, reward, terminated, truncated, _ = env.step(env_action)
+            if isinstance(next_obs, dict): next_obs = next_obs.get("policy", next(iter(next_obs.values())))
             
             if isinstance(next_obs, torch.Tensor):
                 next_obs_np = next_obs.squeeze().cpu().numpy()
