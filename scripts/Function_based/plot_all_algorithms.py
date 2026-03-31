@@ -32,7 +32,11 @@ def main():
             durations = np.load(npy_path)
             # Plot smoothed durations
             smoothed = moving_average(durations, n=100)
-            plt.plot(np.arange(len(smoothed)) + 100, smoothed, label=algo, linewidth=2)
+            if len(durations) < 100:
+                x = np.arange(len(smoothed))
+            else:
+                x = np.arange(len(smoothed)) + 100
+            plt.plot(x, smoothed, label=algo, linewidth=2)
             valid_plots += 1
         else:
             print(f"Warning: No durations.npy found for {algo} at {npy_path}")

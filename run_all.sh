@@ -19,6 +19,9 @@ declare -a EXPERIMENTS=(
     "--algo DQN --buffer_size 1000"
     "--algo A2C --num_envs 4 --num_envs_a2c 4"
     "--algo A2C --num_envs 16 --num_envs_a2c 16"
+    "--algo PPO"
+    "--algo TD3"
+    "--algo SAC"
 )
 
 # 1. Train all algorithms

@@ -75,6 +75,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if args_cli.seed == -1:
         args_cli.seed = random.randint(0, 10000)
 
+    if args_cli.algo == "A2C" and getattr(args_cli, "num_envs_a2c", 1) > 1:
+        args_cli.num_envs = args_cli.num_envs_a2c
+
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     env_cfg.seed = agent_cfg["seed"]
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
@@ -104,7 +107,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     )
     print("device:", device)
 
-    task_name      = "Stabilize"
+    task_name = str(args_cli.task).split("-")[0] if "Stabilize" not in str(args_cli.task) else "Stabilize"
     Algorithm_name = args_cli.algo
     n_episodes     = 10
 
@@ -170,10 +173,23 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                     
                 episode_return = 0
                 for t in range(500):
-                    state_tensor = torch.tensor(obs_np, dtype=torch.float32, device=device).unsqueeze(0)
+                    is_multi_env = obs_np.ndim > 1
+                    state_tensor = torch.tensor(obs_np, dtype=torch.float32, device=device)
+                    if not is_multi_env:
+                        state_tensor = state_tensor.unsqueeze(0)
                     
                     in_state = obs_np if Algorithm_name == "Linear_Q" else state_tensor
-                    if Algorithm_name == "SAC":
+                    
+                    if Algorithm_name in ["AC", "A2C", "PPO"]:
+                        with torch.no_grad():
+                            act_out = agent.policy.act_inference(in_state)
+                            if agent.action_type == "discrete":
+                                a_idx = act_out.squeeze(-1).cpu().numpy()
+                                scaled_a = np.array([agent.scale_action(a) for a in a_idx]) if is_multi_env else agent.scale_action(a_idx.item())
+                            else:
+                                a_idx = act_out.cpu().numpy()
+                                scaled_a = np.array([agent.scale_action(a) for a in a_idx]) if is_multi_env else agent.scale_action(a_idx[0])
+                    elif Algorithm_name == "SAC":
                         scaled_a, a_idx = agent.select_action(in_state, evaluate=True)
                     elif Algorithm_name == "TD3":
                         scaled_a, a_idx = agent.select_action(in_state, add_noise=False)
@@ -181,25 +197,28 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                         scaled_a, a_idx = agent.select_action(in_state)
                     
                     if not isinstance(scaled_a, torch.Tensor):
-                        scaled_a = torch.tensor([scaled_a], dtype=torch.float32)
+                        scaled_a = torch.tensor(scaled_a, dtype=torch.float32)
                         
-                    env_action = scaled_a.unsqueeze(0).to(device)
+                    env_action = scaled_a.to(device) if is_multi_env else scaled_a.unsqueeze(0).to(device)
+                    if env_action.dim() == 1 and env_action.size(0) == num_envs_a2c and Algorithm_name == "A2C":
+                        env_action = env_action.unsqueeze(-1)
+
                     next_obs, reward, terminated, truncated, _ = env.step(env_action)
                     
                     if isinstance(next_obs, torch.Tensor):
-                        next_obs_np = next_obs.squeeze().cpu().numpy()
+                        next_obs_np = next_obs.cpu().numpy()
                     else:
-                        next_obs_np = np.squeeze(next_obs)
+                        next_obs_np = np.array(next_obs)
                     
                     if isinstance(reward, torch.Tensor):
-                        rew_val = reward.squeeze().item()
+                        rew_val = reward.mean().item()
                     else:
-                        rew_val = np.squeeze(reward).item()
+                        rew_val = np.mean(reward)
                         
                     if isinstance(terminated, torch.Tensor):
-                        term_val = terminated.squeeze().item() or truncated.squeeze().item()
+                        term_val = terminated.any().item() or truncated.any().item()
                     else:
-                        term_val = bool(np.squeeze(terminated)) or bool(np.squeeze(truncated))
+                        term_val = np.any(terminated) or np.any(truncated)
                     
                     episode_return += rew_val
                     obs_np = next_obs_np
@@ -207,7 +226,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                     if term_val:
                         break
                 
-                print(f"Episode {episode+1}: Return = {episode_return}, Steps = {t+1}")
+                print(f"Episode {episode+1}: Mean Env Return = {episode_return:.2f}, Steps = {t+1}")
                 results.append({"Episode": episode+1, "Return": episode_return, "Steps": t+1})
                 # ====================================== #
 
