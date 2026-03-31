@@ -137,6 +137,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     agent.load_model(model_dir, model_filename)
     print(f"Loaded: {os.path.join(model_dir, model_filename)}")
 
+    # Force fully deterministic evaluation (No sampling)
+    if hasattr(agent, "epsilon"):
+        agent.epsilon = 0.0
+
     obs, _ = env.reset()
     timestep = 0
 

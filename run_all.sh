@@ -6,7 +6,7 @@ echo " Starting Cart-Pole Full Automation Test"
 echo " (Includes Default 5 Runs + 4 Ablations)"
 echo "========================================="
 
-TASK="Isaac-Cartpole-v0"
+TASK="Stabilize-Isaac-Cartpole-v0"
 
 # Array of all 9 experiment configurations
 declare -a EXPERIMENTS=(
