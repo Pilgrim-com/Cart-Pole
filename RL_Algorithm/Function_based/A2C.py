@@ -430,7 +430,7 @@ class A2C(OnPolicyAlgorithm):
             num_transitions_per_env=num_transitions_per_env,
             obs_shape=obs_shape,
             actions_shape=actions_shape,
-            action_type=self.action_type
+            device=self.device
         )
         # ====================================== #
 
