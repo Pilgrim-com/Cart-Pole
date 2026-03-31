@@ -46,6 +46,8 @@ simulation_app = app_launcher.app
 import gymnasium as gym
 import torch
 import random
+import numpy as np
+import csv
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -102,7 +104,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     )
     print("device:", device)
 
-    task_name      = str(args_cli.task).split("-")[0]   # "Stabilize" or "SwingUp"
+    task_name      = "Stabilize"
     Algorithm_name = args_cli.algo
     n_episodes     = 10
 
@@ -152,6 +154,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     obs, _ = env.reset()
     timestep = 0
+    results = []
 
     while simulation_app.is_running():
         with torch.inference_mode():
@@ -205,7 +208,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                         break
                 
                 print(f"Episode {episode+1}: Return = {episode_return}, Steps = {t+1}")
+                results.append({"Episode": episode+1, "Return": episode_return, "Steps": t+1})
                 # ====================================== #
+
+            csv_filename = os.path.join(model_dir, f"{run_label}_evaluation.csv")
+            with open(csv_filename, mode='w', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=["Episode", "Return", "Steps"])
+                writer.writeheader()
+                writer.writerows(results)
+            print(f"Evaluation results saved to {csv_filename}")
 
         if args_cli.video:
             timestep += 1

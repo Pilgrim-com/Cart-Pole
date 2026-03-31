@@ -111,7 +111,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     )
     print("device:", device)
 
-    task_name      = str(args_cli.task).split("-")[0]   # "Stabilize" or "SwingUp"
+    task_name      = "Stabilize"
     Algorithm_name = args_cli.algo
 
     # ------------------------------------------------------------------ #
@@ -349,7 +349,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # steps = total transitions collected this rollout
                 steps = num_envs_a2c * num_transitions_per_env
                 # episode_return = mean reward per step × steps (comparable scale)
-                episode_return = float(agent.storage.rewards.mean().item()) * steps
+                episode_return = agent.storage.rewards.sum().item()
 
             elif Algorithm_name == "PPO":
                 agent.learn(
@@ -359,7 +359,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                     max_episodes=1,
                 )
                 steps = num_envs_a2c * num_transitions_per_env
-                episode_return = float(agent.storage.rewards.mean().item()) * steps
+                episode_return = agent.storage.rewards.sum().item()
                 
             elif Algorithm_name in ["TD3", "SAC"]:
                 episode_return, steps = agent.learn(env, max_steps=max_steps)
