@@ -34,7 +34,10 @@ class SAC_Actor(nn.Module):
         self.log_std_max = log_std_max
 
         # ========= put your code here ========= #
-        pass
+        self.fc1 = nn.Linear(n_observations, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.mu_layer = nn.Linear(hidden_dim, n_actions)
+        self.log_std_layer = nn.Linear(hidden_dim, n_actions)
         # ====================================== #
 
     def forward(self, state: torch.Tensor):
@@ -48,7 +51,13 @@ class SAC_Actor(nn.Module):
             Tuple[Tensor, Tensor]: (mean, log_std) both shape (batch, n_actions).
         """
         # ========= put your code here ========= #
-        pass
+        x = F.relu(self.fc1(state))
+        x = F.relu(self.fc2(x))
+        mean = self.mu_layer(x)
+        log_std = self.log_std_layer(x)
+        if self.log_std_min is not None and self.log_std_max is not None:
+            log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+        return mean, log_std
         # ====================================== #
 
     def sample(self, state: torch.Tensor):
@@ -65,7 +74,16 @@ class SAC_Actor(nn.Module):
                 - log_prob : Corrected log π(a|s),       shape (batch,).
         """
         # ========= put your code here ========= #
-        pass
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
+        normal = Normal(mean, std)
+        x_t = normal.rsample()
+        action = torch.tanh(x_t)
+        log_prob = normal.log_prob(x_t)
+        # Enforcing Action Bound
+        log_prob -= torch.log(1 - action.pow(2) + 1e-6)
+        log_prob = log_prob.sum(-1, keepdim=True)
+        return action, log_prob.squeeze(-1)
         # ====================================== #
 
 
@@ -87,12 +105,16 @@ class SAC_Critic(nn.Module):
 
         # ===== Q1 network ===== #
         # ========= put your code here ========= #
-        pass
+        self.q1_fc1 = nn.Linear(n_observations + n_actions, hidden_dim)
+        self.q1_fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.q1_out = nn.Linear(hidden_dim, 1)
         # ====================================== #
 
         # ===== Q2 network (independent weights) ===== #
         # ========= put your code here ========= #
-        pass
+        self.q2_fc1 = nn.Linear(n_observations + n_actions, hidden_dim)
+        self.q2_fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.q2_out = nn.Linear(hidden_dim, 1)
         # ====================================== #
 
     def forward(self, state: torch.Tensor, action: torch.Tensor):
@@ -107,7 +129,15 @@ class SAC_Critic(nn.Module):
             Tuple[Tensor, Tensor]: (Q1, Q2) both shape (batch, 1).
         """
         # ========= put your code here ========= #
-        pass
+        xu = torch.cat([state, action], dim=-1)
+        x1 = F.relu(self.q1_fc1(xu))
+        x1 = F.relu(self.q1_fc2(x1))
+        q1 = self.q1_out(x1)
+
+        x2 = F.relu(self.q2_fc1(xu))
+        x2 = F.relu(self.q2_fc2(x2))
+        q2 = self.q2_out(x2)
+        return q1, q2
         # ====================================== #
 
 
@@ -175,7 +205,6 @@ class SAC(OffPolicyAlgorithm):
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
         self.target_entropy = target_entropy if target_entropy is not None \
                               else -float(num_of_action)
-        pass
         # ====================================== #
 
         # OffPolicyAlgorithm.__init__ creates self.memory = ReplayBuffer(buffer_size, batch_size)
@@ -207,7 +236,19 @@ class SAC(OffPolicyAlgorithm):
             Tensor: Scaled action tensor.
         """
         # ========= put your code here ========= #
-        pass
+        state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device)
+        if state_tensor.dim() == 1:
+            state_tensor = state_tensor.unsqueeze(0)
+            
+        with torch.no_grad():
+            if evaluate:
+                mean, _ = self.actor(state_tensor)
+                action = torch.tanh(mean)
+            else:
+                action, _ = self.actor.sample(state_tensor)
+                
+        action_np = action.cpu().numpy()[0]
+        return self.scale_action(action_np), action_np
         # ====================================== #
 
     def calculate_loss(self, states, actions, rewards, next_states, dones):
@@ -225,9 +266,27 @@ class SAC(OffPolicyAlgorithm):
             Tuple[Tensor, Tensor, Tensor | None]:
                 (critic_loss, actor_loss, alpha_loss or None)
         """
-        with torch.no_grad():
         # ========= put your code here ========= #
-            pass
+        with torch.no_grad():
+            next_actions, next_log_pi = self.actor.sample(next_states)
+            q1_next, q2_next = self.critic_target(next_states, next_actions)
+            q_next = torch.min(q1_next, q2_next) - self.alpha * next_log_pi.unsqueeze(-1)
+            q_target = rewards.unsqueeze(-1) + self.discount_factor * (1 - dones.unsqueeze(-1)) * q_next
+
+        q1_curr, q2_curr = self.critic(states, actions)
+        critic_loss = F.mse_loss(q1_curr, q_target) + F.mse_loss(q2_curr, q_target)
+
+        curr_actions, curr_log_pi = self.actor.sample(states)
+        q1_new, q2_new = self.critic(states, curr_actions)
+        q_new = torch.min(q1_new, q2_new)
+        actor_loss = (self.alpha * curr_log_pi.unsqueeze(-1) - q_new).mean()
+
+        if self.auto_alpha:
+            alpha_loss = -(self.log_alpha * (curr_log_pi.unsqueeze(-1) + self.target_entropy).detach()).mean()
+        else:
+            alpha_loss = None
+
+        return critic_loss, actor_loss, alpha_loss
         # ====================================== #
 
     def generate_sample(self, batch_size=None):
@@ -246,6 +305,18 @@ class SAC(OffPolicyAlgorithm):
         batch = super().generate_sample()
         if batch is None:
             return None
+            
+        import numpy as np
+        states, actions, rewards, next_states, dones = zip(*batch)
+        device = self.device
+        
+        states = torch.tensor(np.array(states), dtype=torch.float32, device=device)
+        actions = torch.tensor(np.array(actions), dtype=torch.float32, device=device)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=device)
+        next_states = torch.tensor(np.array(next_states), dtype=torch.float32, device=device)
+        dones = torch.tensor(dones, dtype=torch.float32, device=device)
+        
+        return states, actions, rewards, next_states, dones
         # ====================================== #
 
     def update_policy(self):
@@ -264,10 +335,20 @@ class SAC(OffPolicyAlgorithm):
             states, actions, rewards, next_states, dones
         )
         # ========= put your code here ========= #
-        pass
-        # ====================================== #
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
 
-        self.alpha = self.log_alpha.exp().item()
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
+
+        if alpha_loss is not None:
+            self.alpha_optimizer.zero_grad()
+            alpha_loss.backward()
+            self.alpha_optimizer.step()
+            self.alpha = self.log_alpha.exp().item()
+        # ====================================== #
 
         self.update_target_networks()
 
@@ -276,7 +357,8 @@ class SAC(OffPolicyAlgorithm):
         Overrides the no-op in OffPolicyAlgorithm.
         """
         # ========= put your code here ========= #
-        pass
+        for target_param, param in zip(self.critic_target.parameters(), self.critic.parameters()):
+            target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
         # ====================================== #
 
     def learn(self, env, num_agents: int = 1, max_steps: int = 1000):
@@ -293,7 +375,45 @@ class SAC(OffPolicyAlgorithm):
             Tuple[float, int]: (episode_return, timestep)
         """
         # ========= put your code here ========= #
-        pass
+        import numpy as np
+        obs, _ = env.reset()
+        if isinstance(obs, dict): obs = obs.get("policy", next(iter(obs.values())))
+        if isinstance(obs, torch.Tensor): obs_np = obs.squeeze().cpu().numpy()
+        else: obs_np = np.squeeze(obs)
+            
+        episode_return = 0.0
+        timestep = 0
+            
+        for t in range(max_steps):
+            scaled_a, a_original = self.select_action(obs_np, evaluate=False)
+            
+            if not isinstance(scaled_a, torch.Tensor):
+                scaled_a = torch.tensor([scaled_a], dtype=torch.float32)
+                
+            env_action = scaled_a.unsqueeze(0).to(self.device)
+            next_obs, reward, terminated, truncated, _ = env.step(env_action)
+            
+            if isinstance(next_obs, dict): next_obs = next_obs.get("policy", next(iter(next_obs.values())))
+            if isinstance(next_obs, torch.Tensor): next_obs_np = next_obs.squeeze().cpu().numpy()
+            else: next_obs_np = np.squeeze(next_obs)
+                
+            if isinstance(reward, torch.Tensor): rew_val = reward.squeeze().item()
+            else: rew_val = np.squeeze(reward).item()
+                
+            if isinstance(terminated, torch.Tensor): term_val = terminated.squeeze().item() or truncated.squeeze().item()
+            else: term_val = bool(np.squeeze(terminated)) or bool(np.squeeze(truncated))
+            
+            self.store_transition(obs_np, a_original, rew_val, next_obs_np, term_val)
+            self.update_policy()
+            
+            obs_np = next_obs_np
+            episode_return += rew_val
+            timestep += 1
+            
+            if term_val:
+                break
+                
+        return episode_return, timestep
         # ====================================== #
 
     # ------------------------------------------------------------------ #
@@ -309,7 +429,13 @@ class SAC(OffPolicyAlgorithm):
             filename (str): File name (e.g., 'sac_cartpole.pth').
         """
         # ========= put your code here ========= #
-        pass
+        import os
+        os.makedirs(path, exist_ok=True)
+        torch.save({
+            'actor': self.actor.state_dict(),
+            'critic': self.critic.state_dict(),
+            'log_alpha': self.log_alpha,
+        }, os.path.join(path, filename))
         # ====================================== #
 
     def load_model(self, path: str, filename: str) -> None:

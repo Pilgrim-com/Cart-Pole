@@ -97,6 +97,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     from RL_Algorithm.Function_based.MC_REINFORCE import MC_REINFORCE
     from RL_Algorithm.Function_based.AC            import AC
     from RL_Algorithm.Function_based.A2C           import A2C
+    from RL_Algorithm.Function_based.PPO           import PPO
+    from RL_Algorithm.Function_based.TD3           import TD3
+    from RL_Algorithm.Function_based.SAC           import SAC
 
     # ------------------------------------------------------------------ #
     # Device & naming
@@ -232,6 +235,63 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             max_grad_norm=max_grad_norm,
         )
 
+    elif Algorithm_name == "PPO":
+        agent = PPO(
+            device=device,
+            num_of_action=num_of_action,
+            action_range=action_range,
+            n_observations=n_observations,
+            hidden_dims=hidden_dims,
+            activation="relu",
+            action_type="continuous",
+            init_noise_std=1.0,
+            num_learning_epochs=4,
+            num_mini_batches=4,
+            clip_param=0.2,
+            gamma=discount_factor,
+            lam=0.95,
+            value_loss_coef=value_loss_coef,
+            entropy_coef=entropy_coef,
+            learning_rate=learning_rate,
+            max_grad_norm=max_grad_norm,
+            desired_kl=0.01,
+        )
+
+    elif Algorithm_name == "TD3":
+        agent = TD3(
+            device=device,
+            num_of_action=1 if action_type == "continuous" else num_of_action,
+            action_range=action_range,
+            n_observations=n_observations,
+            hidden_dim=hidden_dim,
+            learning_rate=learning_rate,
+            tau=tau,
+            discount_factor=discount_factor,
+            buffer_size=buffer_size,
+            batch_size=batch_size,
+            exploration_noise=0.1,
+            target_noise=0.2,
+            target_noise_clip=0.5,
+            policy_update_freq=2,
+        )
+
+    elif Algorithm_name == "SAC":
+        agent = SAC(
+            device=device,
+            num_of_action=1 if action_type == "continuous" else num_of_action,
+            action_range=action_range,
+            n_observations=n_observations,
+            hidden_dim=hidden_dim,
+            learning_rate=learning_rate,
+            alpha_lr=learning_rate,
+            tau=tau,
+            discount_factor=discount_factor,
+            buffer_size=buffer_size,
+            batch_size=batch_size,
+            init_alpha=0.2,
+            auto_alpha=True,
+        )
+
     else:
         raise ValueError(f"Unknown algorithm: {Algorithm_name}")
 
@@ -291,11 +351,24 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # episode_return = mean reward per step × steps (comparable scale)
                 episode_return = float(agent.storage.rewards.mean().item()) * steps
 
+            elif Algorithm_name == "PPO":
+                agent.learn(
+                    env,
+                    num_envs=num_envs_a2c,
+                    num_transitions_per_env=num_transitions_per_env,
+                    max_episodes=1,
+                )
+                steps = num_envs_a2c * num_transitions_per_env
+                episode_return = float(agent.storage.rewards.mean().item()) * steps
+                
+            elif Algorithm_name in ["TD3", "SAC"]:
+                episode_return, steps = agent.learn(env, max_steps=max_steps)
+
             # ---------------------------------------------------------------- #
             # Logging — unified for all algorithms (FIX: was inside if-else)
             # ---------------------------------------------------------------- #
-            if Algorithm_name == "A2C":
-                agent.plot_durations(None, show_result=False)  # A2C tracks durations internally
+            if Algorithm_name in ["A2C", "PPO"]:
+                agent.plot_durations(None, show_result=False)  # A2C/PPO tracks durations internally
             else:
                 agent.plot_durations(steps, show_result=False)
 
