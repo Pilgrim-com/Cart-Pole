@@ -22,6 +22,10 @@ parser.add_argument("--algo", type=str, default="DQN", help="Name of the RL algo
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 
+# Ablation arguments (for experiments E3, E4)
+parser.add_argument("--buffer_size", type=int, default=None, help="[Ablation E3] DQN replay buffer size.")
+parser.add_argument("--num_envs_a2c", type=int, default=1, help="[Ablation E4] A2C number of parallel envs.")
+
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
@@ -106,6 +110,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     hidden_dims     = [64, 64]
     action_type     = "discrete"
     
+    # Ablation settings
+    buffer_size = args_cli.buffer_size if args_cli.buffer_size is not None else 10000
+    num_envs_a2c = args_cli.num_envs_a2c
+    
     if Algorithm_name == "Linear_Q":
         agent = Linear_QN(num_of_action=num_of_action, action_range=action_range)
     elif Algorithm_name == "DQN":
@@ -117,9 +125,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     elif Algorithm_name == "A2C":
         agent = A2C(device=device, num_of_action=num_of_action, action_range=action_range, n_observations=n_observations, hidden_dims=hidden_dims, activation="relu", action_type=action_type, init_noise_std=1.0)
 
+    if Algorithm_name == "DQN" and args_cli.buffer_size is not None:
+        run_label = f"{Algorithm_name}_buf{buffer_size}"
+    elif Algorithm_name == "A2C" and num_envs_a2c != 1:
+        run_label = f"{Algorithm_name}_envs{num_envs_a2c}"
+    else:
+        run_label = Algorithm_name
 
-    model_dir      = os.path.join("model", task_name, Algorithm_name)
-    model_filename = f"{Algorithm_name}_final.pth"
+    model_dir      = os.path.join("model", task_name, run_label)
+    model_filename = f"{run_label}_final.pth"
     agent.load_model(model_dir, model_filename)
     print(f"Loaded: {os.path.join(model_dir, model_filename)}")
 
