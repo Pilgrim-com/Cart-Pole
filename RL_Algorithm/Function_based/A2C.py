@@ -477,6 +477,14 @@ class A2C(OnPolicyAlgorithm):
                     obs = next_obs
                     # ====================================== #
 
+                    if not hasattr(self, "current_step"):
+                        self.current_step = 0
+                    self.current_step += 1
+                    
+                    if dones.item():
+                        self.episode_durations.append(self.current_step)
+                        self.current_step = 0
+
                 # ===== Bootstrap returns ===== #
                 # ========= put your code here ========= #
                 self.compute_returns(obs)
