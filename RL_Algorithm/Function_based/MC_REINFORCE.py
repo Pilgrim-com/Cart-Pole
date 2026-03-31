@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import torch
 import torch.nn as nn
+import numpy as np
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Normal, Categorical
