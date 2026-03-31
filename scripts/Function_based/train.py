@@ -211,6 +211,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
         agent.plot_durations(show_result=True)
         plt.ioff()
+        plt.savefig(os.path.join(model_dir, f"{Algorithm_name}_training_curve.png"))
+        print(f"Training curve saved to {os.path.join(model_dir, f'{Algorithm_name}_training_curve.png')}")
         plt.show()
 
         if args_cli.video:
