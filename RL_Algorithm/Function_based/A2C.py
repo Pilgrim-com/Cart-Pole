@@ -442,6 +442,14 @@ class A2C(OnPolicyAlgorithm):
         if isinstance(obs, dict): obs = obs.get("policy", next(iter(obs.values())))
         if not isinstance(obs, torch.Tensor):
             obs = torch.tensor(obs, dtype=torch.float32, device=self.device)
+            
+        # Initialize or reset vectorised step tracking 
+        # (handles forceful reset between learn calls)
+        if hasattr(self, "current_steps"):
+            for i in range(num_envs):
+                if self.current_steps[i].item() > 0:
+                    self.episode_durations.append(self.current_steps[i].item())
+        self.current_steps = torch.zeros(num_envs, dtype=torch.int32, device=self.device)
         # ====================================== #
 
         for episode in range(max_episodes):
@@ -479,13 +487,12 @@ class A2C(OnPolicyAlgorithm):
                     obs = next_obs
                     # ====================================== #
 
-                    if not hasattr(self, "current_step"):
-                        self.current_step = 0
-                    self.current_step += 1
+                    self.current_steps += 1
                     
-                    if dones.item():
-                        self.episode_durations.append(self.current_step)
-                        self.current_step = 0
+                    for env_idx in range(num_envs):
+                        if dones[env_idx].item():
+                            self.episode_durations.append(self.current_steps[env_idx].item())
+                            self.current_steps[env_idx] = 0
 
                 # ===== Bootstrap returns ===== #
                 # ========= put your code here ========= #
