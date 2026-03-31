@@ -219,6 +219,7 @@ class A2C(OnPolicyAlgorithm):
         self.value_loss_coef = value_loss_coef
         self.entropy_coef    = entropy_coef
         self.max_grad_norm   = max_grad_norm
+        self.n_observations  = n_observations
 
         # Experiment with different values and configurations to see how they
         # affect the training process. Remember to document any changes you make
