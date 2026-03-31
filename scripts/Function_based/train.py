@@ -180,10 +180,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     while simulation_app.is_running():
+        log_data = []
 
         for episode in tqdm(range(n_episodes)):
 
             # ========= put your code here ========= #
+            loss = None
             if Algorithm_name in ["DQN", "Linear_Q"]:
                 episode_return, steps = agent.learn(env, max_steps=500)
             elif Algorithm_name == "MC_REINFORCE":
@@ -194,8 +196,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             elif Algorithm_name == "A2C":
                 agent.learn(env, num_envs=1, num_transitions_per_env=500, max_episodes=1)
                 steps = agent.storage.num_transitions_per_env
+                episode_return = float(np.mean(agent.episode_durations[-1:])) if len(agent.episode_durations) > 0 else 0.0
                 
             agent.plot_durations(steps, show_result=False)
+            log_data.append({
+                "episode": episode,
+                "reward": float(episode_return),
+                "steps": steps,
+                "epsilon": getattr(agent, "epsilon", 0.0),
+                "loss": float(loss) if loss is not None else None
+            })
             # ====================================== #
 
             # Logging & checkpointing
@@ -215,6 +225,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         np.save(os.path.join(model_dir, f"{Algorithm_name}_durations.npy"), np.array(agent.episode_durations))
         print(f"Training curve saved to {os.path.join(model_dir, f'{Algorithm_name}_training_curve.png')}")
         plt.show()
+
+        import csv
+        log_path = os.path.join(model_dir, "training_log.csv")
+        with open(log_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["episode","reward","steps","epsilon","loss"])
+            writer.writeheader()
+            writer.writerows(log_data)
+        print(f"Training log saved to {log_path}")
 
         if args_cli.video:
             timestep += 1
