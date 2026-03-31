@@ -225,7 +225,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         plt.savefig(os.path.join(model_dir, f"{Algorithm_name}_training_curve.png"))
         np.save(os.path.join(model_dir, f"{Algorithm_name}_durations.npy"), np.array(agent.episode_durations))
         print(f"Training curve saved to {os.path.join(model_dir, f'{Algorithm_name}_training_curve.png')}")
-        plt.show()
+        plt.close('all')
 
         import csv
         log_path = os.path.join(model_dir, "training_log.csv")

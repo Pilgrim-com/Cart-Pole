@@ -11,7 +11,7 @@ def moving_average(a, n=100):
 
 def main():
     # Change this if you trained on a different task name, e.g., 'Stabilize-Isaac-Cartpole-v0'
-    task_name = "Isaac-Cartpole-v0"
+    task_name = "Isaac"
     base_dir = os.path.join("model", task_name)
     
     if not os.path.exists(base_dir):
