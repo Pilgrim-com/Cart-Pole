@@ -212,6 +212,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         agent.plot_durations(show_result=True)
         plt.ioff()
         plt.savefig(os.path.join(model_dir, f"{Algorithm_name}_training_curve.png"))
+        np.save(os.path.join(model_dir, f"{Algorithm_name}_durations.npy"), np.array(agent.episode_durations))
         print(f"Training curve saved to {os.path.join(model_dir, f'{Algorithm_name}_training_curve.png')}")
         plt.show()
 
