@@ -24,6 +24,10 @@ parser.add_argument("--algo", type=str, default="DQN", help="Name of the RL algo
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 
+# Ablation arguments (for experiments E3, E4)
+parser.add_argument("--buffer_size", type=int, default=None, help="[Ablation E3] DQN replay buffer size.")
+parser.add_argument("--num_envs_a2c", type=int, default=1, help="[Ablation E4] A2C number of parallel envs.")
+
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
@@ -41,7 +45,9 @@ simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
+import csv
 import gymnasium as gym
+import numpy as np
 import torch
 import random
 import matplotlib
@@ -103,78 +109,142 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     Algorithm_name = args_cli.algo
 
     # ------------------------------------------------------------------ #
-    # Hyperparameters
+    # Hyperparameters — Shared by all algorithms
     # ------------------------------------------------------------------ #
-
-    # Shared by all algorithms
     num_of_action   = 2
     action_range    = [-1.0, 1.0] if task_name == "Stabilize" else [-2.0, 2.0]
     learning_rate   = 1e-3
     discount_factor = 0.99
     n_episodes      = 2000
+    max_steps       = 500         # max steps per episode (single-env algorithms)
 
-    # Exploration — LinearQ, DQN only
+    # Exploration — Linear_Q, DQN only
     initial_epsilon = 1.0
-    epsilon_decay   = 1e-3
+    epsilon_decay   = 5e-4        # FIX: was 1e-3 → reached final too fast (~950 ep)
     final_epsilon   = 0.05
 
-    # Network size — neural-network algorithms (DQN, MC_REINFORCE, AC, PPO)
+    # Network — neural-network algorithms
     n_observations  = 4
-
-    hidden_dim      = 64      # single int for DQN / MC_REINFORCE
-    hidden_dims     = [64, 64]    # list of ints for AC / PPO   
-
+    hidden_dim      = 64          # DQN, MC_REINFORCE
+    hidden_dims     = [64, 64]    # AC, A2C
     dropout         = 0.0
 
-    # Action Type — (MC_REINFORCE, AC, PPO)
-    action_type     = "discrete"      # "continuous" | "discrete" 
+    # Action type — MC_REINFORCE, AC, A2C
+    action_type     = "discrete"  # "continuous" | "discrete"
 
     # Replay buffer — DQN only
-    buffer_size     = 10000
+    # Allow CLI override for ablation experiment E3
+    buffer_size     = args_cli.buffer_size if args_cli.buffer_size is not None else 10000
     batch_size      = 64
-    tau             = 0.005      # Polyak soft-update rate for target network
+    tau             = 0.005       # Polyak soft-update rate for target network
 
-    # Rollout — PPO only
-    num_transitions_per_env = None   # steps collected per env before each update
-    num_learning_epochs     = None   # gradient epochs per update
-    num_mini_batches        = None
-    clip_param              = None
-    lam                     = None   # GAE lambda
-    value_loss_coef         = None
-    entropy_coef            = None
-    max_grad_norm           = None
-    desired_kl              = None   # adaptive LR target; set 0 for discrete
+    # Actor-Critic shared — AC, A2C
+    value_loss_coef = 0.5
+    entropy_coef    = 0.01
+    max_grad_norm   = 0.5
+
+    # Rollout — A2C only
+    # Allow CLI override for ablation experiment E4
+    num_envs_a2c             = args_cli.num_envs_a2c   # default 1
+    # Keep total transitions = 500 regardless of num_envs (fair comparison)
+    total_transitions        = 500
+    num_transitions_per_env  = max(1, total_transitions // num_envs_a2c)
 
     # ------------------------------------------------------------------ #
     # Agent construction
     # ------------------------------------------------------------------ #
     if Algorithm_name == "Linear_Q":
-        agent = Linear_QN(num_of_action=num_of_action, action_range=action_range, learning_rate=0.01,
-                          initial_epsilon=initial_epsilon, epsilon_decay=epsilon_decay, final_epsilon=final_epsilon,
-                          discount_factor=discount_factor)
+        agent = Linear_QN(
+            num_of_action=num_of_action,
+            action_range=action_range,
+            learning_rate=learning_rate,   # FIX: was hardcoded 0.01, now matches others
+            initial_epsilon=initial_epsilon,
+            epsilon_decay=epsilon_decay,
+            final_epsilon=final_epsilon,
+            discount_factor=discount_factor,
+        )
+
     elif Algorithm_name == "DQN":
-        agent = DQN(device=device, num_of_action=num_of_action, action_range=action_range, n_observations=n_observations,
-                    hidden_dim=hidden_dim, dropout=dropout, learning_rate=learning_rate, tau=tau,
-                    initial_epsilon=initial_epsilon, epsilon_decay=epsilon_decay, final_epsilon=final_epsilon,
-                    discount_factor=discount_factor, buffer_size=buffer_size, batch_size=batch_size)
+        agent = DQN(
+            device=device,
+            num_of_action=num_of_action,
+            action_range=action_range,
+            n_observations=n_observations,
+            hidden_dim=hidden_dim,
+            dropout=dropout,
+            learning_rate=learning_rate,
+            tau=tau,
+            initial_epsilon=initial_epsilon,
+            epsilon_decay=epsilon_decay,
+            final_epsilon=final_epsilon,
+            discount_factor=discount_factor,
+            buffer_size=buffer_size,
+            batch_size=batch_size,
+        )
+
     elif Algorithm_name == "MC_REINFORCE":
-        agent = MC_REINFORCE(device=device, num_of_action=num_of_action, action_range=action_range, n_observations=n_observations,
-                             hidden_dim=hidden_dim, dropout=dropout, action_type=action_type, learning_rate=learning_rate,
-                             discount_factor=discount_factor)
+        agent = MC_REINFORCE(
+            device=device,
+            num_of_action=num_of_action,
+            action_range=action_range,
+            n_observations=n_observations,
+            hidden_dim=hidden_dim,
+            dropout=dropout,
+            action_type=action_type,
+            learning_rate=learning_rate,
+            discount_factor=discount_factor,
+        )
+
     elif Algorithm_name == "AC":
-        agent = AC(device=device, num_of_action=num_of_action, action_range=action_range, n_observations=n_observations,
-                   hidden_dims=hidden_dims, activation="relu", action_type=action_type, init_noise_std=1.0,
-                   learning_rate=learning_rate, discount_factor=discount_factor, value_loss_coef=0.5, entropy_coef=0.01, max_grad_norm=0.5)
+        agent = AC(
+            device=device,
+            num_of_action=num_of_action,
+            action_range=action_range,
+            n_observations=n_observations,
+            hidden_dims=hidden_dims,
+            activation="relu",
+            action_type=action_type,
+            init_noise_std=1.0,
+            learning_rate=learning_rate,
+            discount_factor=discount_factor,
+            value_loss_coef=value_loss_coef,
+            entropy_coef=entropy_coef,
+            max_grad_norm=max_grad_norm,
+        )
+
     elif Algorithm_name == "A2C":
-        agent = A2C(device=device, num_of_action=num_of_action, action_range=action_range, n_observations=n_observations,
-                   hidden_dims=hidden_dims, activation="relu", action_type=action_type, init_noise_std=1.0,
-                   learning_rate=learning_rate, discount_factor=discount_factor, value_loss_coef=0.5, entropy_coef=0.01, max_grad_norm=0.5)
+        agent = A2C(
+            device=device,
+            num_of_action=num_of_action,
+            action_range=action_range,
+            n_observations=n_observations,
+            hidden_dims=hidden_dims,
+            activation="relu",
+            action_type=action_type,
+            init_noise_std=1.0,
+            learning_rate=learning_rate,
+            discount_factor=discount_factor,
+            value_loss_coef=value_loss_coef,
+            entropy_coef=entropy_coef,
+            max_grad_norm=max_grad_norm,
+        )
+
+    else:
+        raise ValueError(f"Unknown algorithm: {Algorithm_name}")
 
     # ------------------------------------------------------------------ #
-    # Save path — checkpoints saved every save_interval episodes
+    # Save path
     # ------------------------------------------------------------------ #
+    # Include ablation config in folder name for E3/E4
+    if Algorithm_name == "DQN" and args_cli.buffer_size is not None:
+        run_label = f"{Algorithm_name}_buf{buffer_size}"
+    elif Algorithm_name == "A2C" and num_envs_a2c != 1:
+        run_label = f"{Algorithm_name}_envs{num_envs_a2c}"
+    else:
+        run_label = Algorithm_name
+
     save_interval = 500
-    model_dir     = os.path.join("model", task_name, Algorithm_name)
+    model_dir     = os.path.join("model", task_name, run_label)
     os.makedirs(model_dir, exist_ok=True)
 
     obs, _ = env.reset()
@@ -183,58 +253,85 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     while simulation_app.is_running():
         log_data = []
 
-        for episode in tqdm(range(n_episodes)):
+        for episode in tqdm(range(n_episodes), desc=f"[{run_label}]"):
 
-            # ========= put your code here ========= #
-            loss = None
-            if Algorithm_name in ["DQN", "Linear_Q"]:
-                episode_return, steps = agent.learn(env, max_steps=500)
+            loss  = None
+            steps = 0
+            episode_return = 0.0
+
+            # ---------------------------------------------------------------- #
+            # Per-algorithm training step
+            # ---------------------------------------------------------------- #
+            if Algorithm_name == "Linear_Q":
+                episode_return, steps = agent.learn(env, max_steps=max_steps)
+
+            elif Algorithm_name == "DQN":
+                episode_return, steps = agent.learn(env, max_steps=max_steps)
+
             elif Algorithm_name == "MC_REINFORCE":
                 episode_return, loss, traj = agent.learn(env)
                 steps = len(traj)
+
             elif Algorithm_name == "AC":
-                episode_return, loss, steps = agent.learn(env, max_steps=500, num_agents=1)
+                episode_return, loss, steps = agent.learn(env, max_steps=max_steps, num_agents=1)
+
             elif Algorithm_name == "A2C":
-                agent.learn(env, num_envs=1, num_transitions_per_env=500, max_episodes=1)
-                steps = 500  # fixed rollout length
-                episode_return = float(sum(agent.storage.rewards.cpu().numpy().flatten()))
-                agent.plot_durations(episode_return, show_result=False)
+                # A2C collects a fixed-length rollout (not episode-based)
+                agent.learn(
+                    env,
+                    num_envs=num_envs_a2c,
+                    num_transitions_per_env=num_transitions_per_env,
+                    max_episodes=1,
+                )
+                # steps = total transitions collected this rollout
+                steps = num_envs_a2c * num_transitions_per_env
+                # episode_return = mean reward per step × steps (comparable scale)
+                episode_return = float(agent.storage.rewards.mean().item()) * steps
+
+            # ---------------------------------------------------------------- #
+            # Logging — unified for all algorithms (FIX: was inside if-else)
+            # ---------------------------------------------------------------- #
+            if Algorithm_name == "A2C":
+                agent.plot_durations(None, show_result=False)  # A2C tracks durations internally
             else:
                 agent.plot_durations(steps, show_result=False)
-            log_data.append({
-                "episode": episode,
-                "reward": float(episode_return),
-                "steps": steps,
-                "epsilon": getattr(agent, "epsilon", 0.0),
-                "loss": float(loss) if loss is not None else None
-            })
-            # ====================================== #
 
-            # Logging & checkpointing
+            log_data.append({
+                "episode"  : episode,
+                "reward"   : float(episode_return),
+                "steps"    : steps,
+                "epsilon"  : getattr(agent, "epsilon", 0.0),
+                "loss"     : float(loss) if loss is not None else None,
+            })
+
             if episode % 100 == 0:
-                print(f"[{Algorithm_name}] episode {episode}")
+                print(f"[{run_label}] ep {episode:4d} | steps {steps:4d} | return {episode_return:.2f}")
 
             if episode % save_interval == 0 and episode > 0:
-                agent.save_model(model_dir, f"{Algorithm_name}_{episode}.pth")
+                agent.save_model(model_dir, f"{run_label}_{episode}.pth")
 
-        # Save final model and display training curve
-        agent.save_model(model_dir, f"{Algorithm_name}_final.pth")
+        # ------------------------------------------------------------------ #
+        # End of training — save final model, curve, log
+        # ------------------------------------------------------------------ #
+        agent.save_model(model_dir, f"{run_label}_final.pth")
         print("Training complete.")
 
         agent.plot_durations(show_result=True)
         plt.ioff()
-        plt.savefig(os.path.join(model_dir, f"{Algorithm_name}_training_curve.png"))
-        np.save(os.path.join(model_dir, f"{Algorithm_name}_durations.npy"), np.array(agent.episode_durations))
-        print(f"Training curve saved to {os.path.join(model_dir, f'{Algorithm_name}_training_curve.png')}")
-        plt.close('all')
+        plt.savefig(os.path.join(model_dir, f"{run_label}_training_curve.png"))
+        np.save(
+            os.path.join(model_dir, f"{run_label}_durations.npy"),
+            np.array(agent.episode_durations),
+        )
+        print(f"Training curve saved → {model_dir}/{run_label}_training_curve.png")
+        plt.close("all")
 
-        import csv
         log_path = os.path.join(model_dir, "training_log.csv")
         with open(log_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["episode","reward","steps","epsilon","loss"])
+            writer = csv.DictWriter(f, fieldnames=["episode", "reward", "steps", "epsilon", "loss"])
             writer.writeheader()
             writer.writerows(log_data)
-        print(f"Training log saved to {log_path}")
+        print(f"Training log saved → {log_path}")
 
         if args_cli.video:
             timestep += 1
