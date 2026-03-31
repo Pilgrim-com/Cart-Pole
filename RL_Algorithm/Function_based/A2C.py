@@ -419,13 +419,12 @@ class A2C(OnPolicyAlgorithm):
         # ===== Create rollout buffer via inherited _init_storage() ===== #
         # ========= put your code here ========= #
         actions_shape = (self.num_of_action,) if self.action_type == "continuous" else (1,)
-        if hasattr(env, "observation_space"):
+        
+        # Fallback to predefined parameter since IsaacLab Dict spaces return None for shape
+        if hasattr(env, "observation_space") and getattr(env.observation_space, "shape", None) is not None:
             obs_shape = env.observation_space.shape
         else:
-            # try pulling observation shape by doing a fast reset
-            obs, _ = env.reset()
-            if isinstance(obs, dict): obs = obs.get("policy", next(iter(obs.values())))
-            obs_shape = obs.shape[1:]
+            obs_shape = (self.n_observations,)
             
         self._init_storage(
             num_envs=num_envs,
