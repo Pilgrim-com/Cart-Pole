@@ -20,6 +20,7 @@ parser.add_argument("--video_length", type=int, default=200, help="Length of the
 parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument("--algo", type=str, default="DQN", help="Name of the RL algorithm (e.g. Linear_Q, DQN, AC, MC_REINFORCE, A2C).")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 
@@ -99,7 +100,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print("device:", device)
 
     task_name      = str(args_cli.task).split("-")[0]   # "Stabilize" or "SwingUp"
-    Algorithm_name = "DQN"                              # update this to match your import
+    Algorithm_name = args_cli.algo
 
     # ------------------------------------------------------------------ #
     # Hyperparameters
