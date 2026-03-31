@@ -196,14 +196,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 episode_return, loss, steps = agent.learn(env, max_steps=500, num_agents=1)
             elif Algorithm_name == "A2C":
                 agent.learn(env, num_envs=1, num_transitions_per_env=500, max_episodes=1)
-                steps = int(agent.episode_durations[-1]) if len(agent.episode_durations) > 0 else 0
-                episode_return = float(steps)  # Reward is +1 per step
-                
-            # Prevent A2C from double-appending the same duration via plot_durations
-            if Algorithm_name != "A2C":
-                agent.plot_durations(steps, show_result=False)
+                steps = 500  # fixed rollout length
+                episode_return = float(sum(agent.storage.rewards.cpu().numpy().flatten()))
+                agent.plot_durations(episode_return, show_result=False)
             else:
-                agent.plot_durations(None, show_result=False)
+                agent.plot_durations(steps, show_result=False)
             log_data.append({
                 "episode": episode,
                 "reward": float(episode_return),

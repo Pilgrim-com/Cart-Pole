@@ -299,7 +299,8 @@ class A2C(OnPolicyAlgorithm):
         # ===== Bootstrap value at end of rollout ===== #
         # ========= put your code here ========= #
         with torch.no_grad():
-            last_val = self.policy.evaluate(last_obs).squeeze(-1) if self.policy.evaluate(last_obs).dim() > 1 else self.policy.evaluate(last_obs)
+            val_out = self.policy.evaluate(last_obs)
+            last_val = val_out.squeeze(-1) if val_out.dim() > 1 else val_out
         # ====================================== #
 
         for step in reversed(range(self.storage.num_transitions_per_env)):
@@ -309,8 +310,8 @@ class A2C(OnPolicyAlgorithm):
             if step == self.storage.num_transitions_per_env - 1:
                 next_val = last_val
             else:
-                next_val = self.storage.values[step + 1]
-            delta = self.storage.rewards[step] + self.gamma * next_val * (1 - self.storage.dones[step]) - self.storage.values[step]
+                next_val = self.storage.values[step + 1].squeeze(-1)
+            delta = self.storage.rewards[step] + self.discount_factor * next_val * (1 - self.storage.dones[step]) - self.storage.values[step]
             # ====================================== #
 
             # ===== A2C: advantage = delta (no lambda accumulation) ===== #
@@ -358,7 +359,8 @@ class A2C(OnPolicyAlgorithm):
         # ========= put your code here ========= #
         self.policy._update_distribution(obs_batch)
         log_probs = self.policy.get_actions_log_prob(actions_batch)
-        values = self.policy.evaluate(obs_batch).squeeze(-1) if self.policy.evaluate(obs_batch).dim() > 1 else self.policy.evaluate(obs_batch)
+        val_out_batch = self.policy.evaluate(obs_batch)
+        values = val_out_batch.squeeze(-1) if val_out_batch.dim() > 1 else val_out_batch
         entropy = self.policy.entropy
         # ====================================== #
 
