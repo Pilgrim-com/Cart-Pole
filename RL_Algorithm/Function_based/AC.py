@@ -62,13 +62,17 @@ class ActorCritic(nn.Module):
     def action_mean(self) -> torch.Tensor:
         if self.action_type == "continuous":
             return self.distribution.mean
-        return self.distribution.probs
+        return self.distribution.probs.argmax(dim=-1, keepdim=True).float()
 
     @property
     def action_std(self) -> torch.Tensor:
         if self.action_type == "continuous":
             return self.distribution.stddev
-        return torch.ones_like(self.distribution.probs)
+        return torch.ones(
+            (self.distribution.probs.shape[0], 1),
+            device=self.distribution.probs.device,
+            dtype=self.distribution.probs.dtype,
+        )
 
     @property
     def entropy(self) -> torch.Tensor:

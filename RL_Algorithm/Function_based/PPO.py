@@ -115,17 +115,22 @@ class PPO(OnPolicyAlgorithm):
         Returns:
             Tensor: Sampled actions.
         """
-        # ========= put your code here ========= #
         obs = obs.to(self.device)
         with torch.no_grad():
             self.transition.actions = self.policy.act(obs)
+
             val = self.policy.evaluate(obs)
             self.transition.values = val.view(-1, 1)
-            
+
             if self.action_type == 'continuous':
                 log_p = self.policy.distribution.log_prob(self.transition.actions).sum(dim=-1)
+                self.transition.action_mean = self.policy.action_mean
+                self.transition.action_sigma = self.policy.action_std
             else:
                 log_p = self.policy.distribution.log_prob(self.transition.actions.squeeze(-1))
+                self.transition.action_mean = self.policy.action_mean
+                self.transition.action_sigma = self.policy.action_std
+
             self.transition.actions_log_prob = log_p.view(-1, 1)
         # ====================================== #
 
