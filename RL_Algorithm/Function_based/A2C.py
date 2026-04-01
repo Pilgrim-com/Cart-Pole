@@ -128,12 +128,13 @@ class ActorCritic_A2C(nn.Module):
         Discrete  : scalar log-prob      → shape (batch,).
         """
         # ========= put your code here ========= #
+        if self.action_type == "discrete":
+            if actions.dim() > 1:
+                actions = actions.squeeze(-1)
+            return self.distribution.log_prob(actions)
+
         log_prob = self.distribution.log_prob(actions)
-        if self.action_type == "continuous":
-            log_prob = log_prob.sum(dim=-1)
-        elif self.action_type == "discrete" and log_prob.dim() > 1:
-            log_prob = log_prob.squeeze()
-        return log_prob
+        return log_prob.sum(dim=-1)
         # ====================================== #
 
 
@@ -248,9 +249,16 @@ class A2C(OnPolicyAlgorithm):
         """
         # ========= put your code here ========= #
         self.transition.actions = self.policy.act(obs)
+
         val = self.policy.evaluate(obs)
         self.transition.values = val.view(-1, 1)
-        log_p = self.policy.get_actions_log_prob(self.transition.actions)
+
+        if self.action_type == "discrete":
+            action_for_logprob = self.transition.actions.squeeze(-1)
+            log_p = self.policy.get_actions_log_prob(action_for_logprob)
+        else:
+            log_p = self.policy.get_actions_log_prob(self.transition.actions)
+
         self.transition.actions_log_prob = log_p.view(-1, 1)
         self.transition.action_mean = self.policy.action_mean
         self.transition.action_sigma = self.policy.action_std
