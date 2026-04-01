@@ -122,6 +122,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     learning_rate   = 1e-3
     discount_factor = 0.99
     n_episodes      = 2000
+    n_episodes_onpolicy = 500   # A2C/PPO: fewer rollouts since each collects more data
     max_steps       = 500         # max steps per episode (single-env algorithms)
 
     # Exploration — Linear_Q, DQN only
@@ -306,17 +307,19 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     else:
         run_label = Algorithm_name
 
-    save_interval = 500
+    save_interval = 100
     model_dir     = os.path.join("model", task_name, run_label)
     os.makedirs(model_dir, exist_ok=True)
 
     obs, _ = env.reset()
     timestep = 0
 
+    actual_n_episodes = n_episodes_onpolicy if Algorithm_name in ["A2C", "PPO"] else n_episodes
+
     while simulation_app.is_running():
         log_data = []
 
-        for episode in tqdm(range(n_episodes), desc=f"[{run_label}]"):
+        for episode in tqdm(range(actual_n_episodes), desc=f"[{run_label}]"):
 
             loss  = None
             steps = 0
@@ -390,35 +393,36 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             if episode % save_interval == 0 and episode > 0:
                 agent.save_model(model_dir, f"{run_label}_{episode}.pth")
 
-        # ------------------------------------------------------------------ #
-        # End of training — save final model, curve, log
-        # ------------------------------------------------------------------ #
-        agent.save_model(model_dir, f"{run_label}_final.pth")
-        print("Training complete.")
-
-        agent.plot_durations(show_result=True)
-        plt.ioff()
-        plt.savefig(os.path.join(model_dir, f"{run_label}_training_curve.png"))
-        np.save(
-            os.path.join(model_dir, f"{run_label}_durations.npy"),
-            np.array(agent.episode_durations),
-        )
-        print(f"Training curve saved → {model_dir}/{run_label}_training_curve.png")
-        plt.close("all")
-
-        log_path = os.path.join(model_dir, "training_log.csv")
-        with open(log_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["episode", "reward", "steps", "epsilon", "loss"])
-            writer.writeheader()
-            writer.writerows(log_data)
-        print(f"Training log saved → {log_path}")
-
         if args_cli.video:
             timestep += 1
             if timestep == args_cli.video_length:
                 break
 
         break
+
+    # ------------------------------------------------------------------ #
+    # End of training — save final model, curve, log (OUTSIDE while loop)
+    # ------------------------------------------------------------------ #
+    agent.save_model(model_dir, f"{run_label}_final.pth")
+    print("Training complete.")
+
+    agent.plot_durations(show_result=True)
+    plt.ioff()
+    plt.savefig(os.path.join(model_dir, f"{run_label}_training_curve.png"))
+    np.save(
+        os.path.join(model_dir, f"{run_label}_durations.npy"),
+        np.array(agent.episode_durations),
+    )
+    print(f"Training curve saved → {model_dir}/{run_label}_training_curve.png")
+    plt.close("all")
+
+    if log_data:
+        log_path = os.path.join(model_dir, "training_log.csv")
+        with open(log_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["episode", "reward", "steps", "epsilon", "loss"])
+            writer.writeheader()
+            writer.writerows(log_data)
+        print(f"Training log saved → {log_path}")
     # ==================================================================== #
 
     env.close()
