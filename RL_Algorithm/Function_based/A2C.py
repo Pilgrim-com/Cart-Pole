@@ -61,11 +61,21 @@ class ActorCritic_A2C(nn.Module):
 
     @property
     def action_mean(self):
-        return self.distribution.mean
+        if self.action_type == "continuous":
+            return self.distribution.mean
+        # discrete: placeholder with shape (batch, 1)
+        return self.distribution.probs.argmax(dim=-1, keepdim=True).float()
 
     @property
     def action_std(self):
-        return self.distribution.stddev
+        if self.action_type == "continuous":
+            return self.distribution.stddev
+        # discrete: no real std, use ones with shape (batch, 1)
+        return torch.ones(
+            (self.distribution.probs.shape[0], 1),
+            device=self.distribution.probs.device,
+            dtype=self.distribution.probs.dtype,
+        )
 
     @property
     def entropy(self):
@@ -260,8 +270,13 @@ class A2C(OnPolicyAlgorithm):
             log_p = self.policy.get_actions_log_prob(self.transition.actions)
 
         self.transition.actions_log_prob = log_p.view(-1, 1)
-        self.transition.action_mean = self.policy.action_mean
-        self.transition.action_sigma = self.policy.action_std
+
+        self.transition.action_mean = self.policy.action_mean.view(-1, 1) \
+            if self.action_type == "discrete" else self.policy.action_mean
+
+        self.transition.action_sigma = self.policy.action_std.view(-1, 1) \
+            if self.action_type == "discrete" else self.policy.action_std
+
         return self.transition.actions
         # ====================================== #
 
