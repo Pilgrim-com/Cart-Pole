@@ -453,7 +453,7 @@ class A2C(OnPolicyAlgorithm):
         # ====================================== #
 
         for episode in range(max_episodes):
-            with torch.inference_mode():
+            with torch.no_grad():
                 for _ in range(num_transitions_per_env):
                     # ===== Sample actions ===== #
                     # ========= put your code here ========= #
