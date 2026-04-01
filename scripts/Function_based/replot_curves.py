@@ -11,9 +11,8 @@ BASE = "model/Stabilize"
 # All possible run labels
 RUN_LABELS = [
     "Linear_Q", "DQN", "MC_REINFORCE", "AC", "A2C",
-    "DQN_buf100", "DQN_buf1000",
-    "A2C_envs4", "A2C_envs16",
-    "PPO", "TD3", "SAC",
+    "DQN_buf100", "DQN_buf1000"
+    #"A2C_envs4", "A2C_envs16"
 ]
 
 for label in RUN_LABELS:

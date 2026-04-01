@@ -4,7 +4,12 @@ import csv
 import os
 
 BASE = "model/Stabilize"
-ALGOS = ["Linear_Q", "DQN", "MC_REINFORCE"]
+ALGOS = [
+    "Linear_Q", "DQN", "MC_REINFORCE", "AC", "A2C",
+    "DQN_buf100", "DQN_buf1000",
+    "A2C_envs4", "A2C_envs16",
+    "PPO", "TD3", "SAC",
+]
 MAX_EP = 1000
 
 for algo in ALGOS:
