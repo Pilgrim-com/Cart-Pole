@@ -360,6 +360,9 @@ class PPO(OnPolicyAlgorithm):
                         self.episode_durations.append(self.current_steps[env_idx].item())
                         self.current_steps[env_idx] = 0
                         
+            # ===== Capture rollout reward BEFORE update clears storage ===== #
+            rollout_return = self.storage.rewards.sum().item()
+
             self.compute_returns(last_obs=obs)
             losses = self.update()
             
@@ -371,6 +374,8 @@ class PPO(OnPolicyAlgorithm):
             })
             
         self.plot_durations(self.storage.num_transitions_per_env, show_result=False)
+
+        return rollout_return, num_envs * num_transitions_per_env
         # ====================================== #
 
 

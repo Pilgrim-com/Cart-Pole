@@ -343,26 +343,20 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
             elif Algorithm_name == "A2C":
                 # A2C collects a fixed-length rollout (not episode-based)
-                agent.learn(
+                episode_return, steps = agent.learn(
                     env,
                     num_envs=num_envs_a2c,
                     num_transitions_per_env=num_transitions_per_env,
                     max_episodes=1,
                 )
-                # steps = total transitions collected this rollout
-                steps = num_envs_a2c * num_transitions_per_env
-                # episode_return = mean reward per step × steps (comparable scale)
-                episode_return = agent.storage.rewards.sum().item()
 
             elif Algorithm_name == "PPO":
-                agent.learn(
+                episode_return, steps = agent.learn(
                     env,
                     num_envs=num_envs_a2c,
                     num_transitions_per_env=num_transitions_per_env,
                     max_episodes=1,
                 )
-                steps = num_envs_a2c * num_transitions_per_env
-                episode_return = agent.storage.rewards.sum().item()
                 
             elif Algorithm_name in ["TD3", "SAC"]:
                 episode_return, steps = agent.learn(env, max_steps=max_steps)

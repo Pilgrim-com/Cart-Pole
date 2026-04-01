@@ -524,10 +524,16 @@ class A2C(OnPolicyAlgorithm):
                 self.compute_returns(obs)
                 # ====================================== #
 
+            # ===== Capture rollout reward BEFORE update clears storage ===== #
+            rollout_return = self.storage.rewards.sum().item()
+            total_steps = num_envs * num_transitions_per_env
+
             # ===== Policy update (calls storage.clear() internally) ===== #
             # ========= put your code here ========= #
             losses = self.update()
             # ====================================== #
+
+        return rollout_return, total_steps
 
     # ------------------------------------------------------------------ #
     # Inference & Persistence                                              #
