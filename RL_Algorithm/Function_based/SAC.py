@@ -388,9 +388,9 @@ class SAC(OffPolicyAlgorithm):
             scaled_a, a_original = self.select_action(obs_np, evaluate=False)
             
             if not isinstance(scaled_a, torch.Tensor):
-                scaled_a = torch.tensor([scaled_a], dtype=torch.float32)
+                scaled_a = torch.tensor(np.array(scaled_a), dtype=torch.float32)
                 
-            env_action = scaled_a.unsqueeze(0).to(self.device)
+            env_action = scaled_a.unsqueeze(0).to(self.device) if scaled_a.dim() == 1 else scaled_a.view(1, -1).to(self.device)
             next_obs, reward, terminated, truncated, _ = env.step(env_action)
             
             if isinstance(next_obs, dict): next_obs = next_obs.get("policy", next(iter(next_obs.values())))

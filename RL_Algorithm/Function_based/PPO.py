@@ -334,7 +334,10 @@ class PPO(OnPolicyAlgorithm):
                     env_actions = []
                     for a in actions:
                         env_actions.append(self.scale_action(a.cpu().numpy()))
-                    env_actions = torch.tensor(env_actions, device=self.device, dtype=torch.float32)
+                    env_actions = torch.tensor(np.array(env_actions), device=self.device, dtype=torch.float32)
+                    
+                if env_actions.dim() == 1:
+                    env_actions = env_actions.unsqueeze(-1)
                     
                 next_obs, rewards, dones, _, _ = env.step(env_actions)
                 if isinstance(next_obs, dict): next_obs = next_obs.get("policy", next(iter(next_obs.values())))
