@@ -315,9 +315,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     actual_n_episodes = n_episodes_onpolicy if Algorithm_name in ["A2C", "PPO"] else n_episodes
+    log_data = []
 
     while simulation_app.is_running():
-        log_data = []
 
         for episode in tqdm(range(actual_n_episodes), desc=f"[{run_label}]"):
 
