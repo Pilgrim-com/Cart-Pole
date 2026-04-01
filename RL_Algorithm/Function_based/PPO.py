@@ -327,6 +327,7 @@ class PPO(OnPolicyAlgorithm):
         pbar = tqdm(range(max_episodes), desc="[PPO]")
         for episode in pbar:
             for _ in range(num_transitions_per_env):
+                self.transition.observations = obs.clone()
                 actions = self.act(obs)
                 if self.action_type == "discrete":
                     env_actions = actions.squeeze(-1)
