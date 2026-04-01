@@ -121,8 +121,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     action_range    = [-1.0, 1.0] if task_name == "Stabilize" else [-2.0, 2.0]
     learning_rate   = 1e-3
     discount_factor = 0.99
-    n_episodes      = 2000
-    n_episodes_onpolicy = 500   # A2C/PPO: fewer rollouts since each collects more data
+    n_episodes      = 1000
+    n_episodes_onpolicy = 300   # A2C/PPO: fewer rollouts since each collects more data
     max_steps       = 500         # max steps per episode (single-env algorithms)
 
     # Exploration — Linear_Q, DQN only
