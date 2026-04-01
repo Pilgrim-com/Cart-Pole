@@ -368,9 +368,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             # Logging — unified for all algorithms (FIX: was inside if-else)
             # ---------------------------------------------------------------- #
             if Algorithm_name in ["A2C", "PPO"]:
-                agent.plot_durations(None, show_result=False)  # A2C/PPO tracks durations internally
+                if episode % 50 == 0:
+                    agent.plot_durations(None, show_result=False)  # A2C/PPO tracks durations internally
             else:
-                agent.plot_durations(steps, show_result=False)
+                if episode % 50 == 0:
+                    agent.plot_durations(steps, show_result=False)
+                else:
+                    agent.episode_durations.append(steps)  # still track, just don't plot
 
             log_data.append({
                 "episode"  : episode,
