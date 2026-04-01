@@ -248,8 +248,10 @@ class A2C(OnPolicyAlgorithm):
         """
         # ========= put your code here ========= #
         self.transition.actions = self.policy.act(obs)
-        self.transition.values = self.policy.evaluate(obs).squeeze(-1) if self.policy.evaluate(obs).dim() > 1 else self.policy.evaluate(obs)
-        self.transition.actions_log_prob = self.policy.get_actions_log_prob(self.transition.actions)
+        val = self.policy.evaluate(obs)
+        self.transition.values = val.view(-1, 1)
+        log_p = self.policy.get_actions_log_prob(self.transition.actions)
+        self.transition.actions_log_prob = log_p.view(-1, 1)
         self.transition.action_mean = self.policy.action_mean
         self.transition.action_sigma = self.policy.action_std
         return self.transition.actions
@@ -268,8 +270,8 @@ class A2C(OnPolicyAlgorithm):
             dones (Tensor): shape (num_envs,) or (num_envs, 1).
         """
         # ========= put your code here ========= #
-        self.transition.rewards = rewards.clone()
-        self.transition.dones = dones.clone()
+        self.transition.rewards = rewards.clone().view(-1, 1)
+        self.transition.dones = dones.clone().view(-1, 1)
         # ====================================== #
 
         self.add_transition()
@@ -301,7 +303,7 @@ class A2C(OnPolicyAlgorithm):
         # ========= put your code here ========= #
         with torch.no_grad():
             val_out = self.policy.evaluate(last_obs)
-            last_val = val_out.squeeze(-1) if val_out.dim() > 1 else val_out
+            last_val = val_out.view(-1, 1)
         # ====================================== #
 
         for step in reversed(range(self.storage.num_transitions_per_env)):
@@ -311,7 +313,7 @@ class A2C(OnPolicyAlgorithm):
             if step == self.storage.num_transitions_per_env - 1:
                 next_val = last_val
             else:
-                next_val = self.storage.values[step + 1].squeeze(-1)
+                next_val = self.storage.values[step + 1]
             delta = self.storage.rewards[step] + self.discount_factor * next_val * (1 - self.storage.dones[step]) - self.storage.values[step]
             # ====================================== #
 

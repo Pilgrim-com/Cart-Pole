@@ -119,12 +119,14 @@ class PPO(OnPolicyAlgorithm):
         obs = obs.to(self.device)
         with torch.no_grad():
             self.transition.actions = self.policy.act(obs)
-            self.transition.values = self.policy.evaluate(obs).squeeze(-1)
+            val = self.policy.evaluate(obs)
+            self.transition.values = val.view(-1, 1)
             
             if self.action_type == 'continuous':
-                self.transition.actions_log_prob = self.policy.distribution.log_prob(self.transition.actions).sum(dim=-1)
+                log_p = self.policy.distribution.log_prob(self.transition.actions).sum(dim=-1)
             else:
-                self.transition.actions_log_prob = self.policy.distribution.log_prob(self.transition.actions.squeeze(-1))
+                log_p = self.policy.distribution.log_prob(self.transition.actions.squeeze(-1))
+            self.transition.actions_log_prob = log_p.view(-1, 1)
         # ====================================== #
 
         return self.transition.actions
@@ -142,8 +144,8 @@ class PPO(OnPolicyAlgorithm):
             dones (Tensor): shape (num_envs,) or (num_envs, 1).
         """
         # ========= put your code here ========= #
-        self.transition.rewards = rewards.clone().detach().to(self.device).squeeze(-1)
-        self.transition.dones = dones.clone().detach().to(self.device).squeeze(-1)
+        self.transition.rewards = rewards.clone().detach().to(self.device).view(-1, 1)
+        self.transition.dones = dones.clone().detach().to(self.device).view(-1, 1)
         # ====================================== #
 
         # Flush transition into RolloutBuffer via inherited add_transition()
@@ -164,7 +166,8 @@ class PPO(OnPolicyAlgorithm):
         # ========= put your code here ========= #
         last_obs = last_obs.to(self.device)
         with torch.no_grad():
-            last_values = self.policy.evaluate(last_obs).squeeze(-1)
+            val_out = self.policy.evaluate(last_obs)
+            last_values = val_out.view(-1, 1)
             
         advantage = 0
         for step in reversed(range(self.storage.num_transitions_per_env)):
