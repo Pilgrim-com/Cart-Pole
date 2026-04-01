@@ -187,8 +187,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                                 a_idx = act_out.squeeze(-1).cpu().numpy()
                                 scaled_a = np.array([agent.scale_action(a) for a in a_idx]) if is_multi_env else agent.scale_action(a_idx.item())
                             else:
-                                a_idx = act_out.cpu().numpy()
-                                scaled_a = np.array([agent.scale_action(a) for a in a_idx]) if is_multi_env else agent.scale_action(a_idx[0])
+                                # Continuous: network output is raw action, no scale_action needed
+                                scaled_a = act_out.squeeze().cpu().numpy()
+                                a_idx = scaled_a
                     elif Algorithm_name == "SAC":
                         scaled_a, a_idx = agent.select_action(in_state, evaluate=True)
                     elif Algorithm_name == "TD3":

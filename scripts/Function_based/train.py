@@ -79,7 +79,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if args_cli.seed == -1:
         args_cli.seed = random.randint(0, 10000)
 
-    if args_cli.algo == "A2C" and getattr(args_cli, "num_envs_a2c", 1) > 1:
+    if args_cli.algo in ["A2C", "PPO"] and getattr(args_cli, "num_envs_a2c", 1) > 1:
         args_cli.num_envs = args_cli.num_envs_a2c
 
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
