@@ -141,12 +141,13 @@ class ActorCritic(nn.Module):
         Discrete  : scalar log-prob → shape (batch,).
         """
         # ========= put your code here ========= #
+        if self.action_type == "discrete":
+            if actions.dim() > 1:
+                actions = actions.squeeze(-1)
+            return self.distribution.log_prob(actions)
+
         log_prob = self.distribution.log_prob(actions)
-        if self.action_type == "continuous":
-            log_prob = log_prob.sum(dim=-1)
-        elif self.action_type == "discrete" and log_prob.dim() > 1:
-            log_prob = log_prob.squeeze()
-        return log_prob
+        return log_prob.sum(dim=-1)
         # ====================================== #
 
 
@@ -224,7 +225,7 @@ class AC(OnPolicyAlgorithm):
     # Trajectory Collection                                                #
     # ------------------------------------------------------------------ #
 
-    def generate_trajectory(self, env) -> tuple:
+    def generate_trajectory(self, env, max_steps: int = 500) -> tuple:
         """
         Run one full episode and collect the trajectory as lists.
 
@@ -255,8 +256,10 @@ class AC(OnPolicyAlgorithm):
             action = self.policy.distribution.sample()
             if self.action_type == "discrete" and action.dim() == 1:
                 action = action.unsqueeze(1)
-                
-            log_prob = self.policy.get_actions_log_prob(action)
+
+            # For discrete: squeeze action to 1D before log_prob
+            action_for_logprob = action.squeeze(-1) if self.action_type == "discrete" else action
+            log_prob = self.policy.get_actions_log_prob(action_for_logprob)
             value = self.policy.evaluate(state_tensor)
             
             log_prob_actions_list.append(log_prob.squeeze())
@@ -295,7 +298,7 @@ class AC(OnPolicyAlgorithm):
             obs_np = next_obs_np
             timestep += 1
             
-            if term_val:
+            if term_val or timestep >= max_steps:
                 break
                 
         episode_return = sum(rewards)
@@ -385,7 +388,7 @@ class AC(OnPolicyAlgorithm):
         self.policy.train()
 
         # ========= put your code here ========= #
-        episode_return, log_prob_actions, values, rewards_list, timestep = self.generate_trajectory(env)
+        episode_return, log_prob_actions, values, rewards_list, timestep = self.generate_trajectory(env, max_steps=max_steps)
         rewards = torch.tensor(rewards_list, dtype=torch.float32, device=self.device)
         returns = self.compute_returns(rewards)
         returns = (returns - returns.mean()) / (returns.std() + 1e-8)

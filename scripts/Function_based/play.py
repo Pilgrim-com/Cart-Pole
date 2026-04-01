@@ -248,7 +248,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     env.close()
 
-
 if __name__ == "__main__":
     main()
     simulation_app.close()
