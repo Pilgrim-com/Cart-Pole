@@ -238,7 +238,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     elif Algorithm_name == "PPO":
         agent = PPO(
             device=device,
-            num_of_action=num_of_action,
+            num_of_action=1,  # Continuous Cart-Pole strictly takes 1D force
             action_range=action_range,
             n_observations=n_observations,
             hidden_dims=hidden_dims,
@@ -260,7 +260,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     elif Algorithm_name == "TD3":
         agent = TD3(
             device=device,
-            num_of_action=1 if action_type == "continuous" else num_of_action,
+            num_of_action=1,  # Continuous Cart-Pole strictly takes 1D force
             action_range=action_range,
             n_observations=n_observations,
             hidden_dim=hidden_dim,
@@ -278,7 +278,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     elif Algorithm_name == "SAC":
         agent = SAC(
             device=device,
-            num_of_action=1 if action_type == "continuous" else num_of_action,
+            num_of_action=1,  # Continuous Cart-Pole strictly takes 1D force
             action_range=action_range,
             n_observations=n_observations,
             hidden_dim=hidden_dim,

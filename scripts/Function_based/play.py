@@ -133,11 +133,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     elif Algorithm_name == "A2C":
         agent = A2C(device=device, num_of_action=num_of_action, action_range=action_range, n_observations=n_observations, hidden_dims=hidden_dims, activation="relu", action_type=action_type, init_noise_std=1.0)
     elif Algorithm_name == "PPO":
-        agent = PPO(device=device, num_of_action=num_of_action, action_range=action_range, n_observations=n_observations, hidden_dims=hidden_dims, activation="relu", action_type="continuous", init_noise_std=1.0, num_learning_epochs=4, num_mini_batches=4, clip_param=0.2, gamma=0.99, lam=0.95, value_loss_coef=0.5, entropy_coef=0.01, learning_rate=1e-3, max_grad_norm=0.5, desired_kl=0.01)
+        agent = PPO(device=device, num_of_action=1, action_range=action_range, n_observations=n_observations, hidden_dims=hidden_dims, activation="relu", action_type="continuous", init_noise_std=1.0, num_learning_epochs=4, num_mini_batches=4, clip_param=0.2, gamma=0.99, lam=0.95, value_loss_coef=0.5, entropy_coef=0.01, learning_rate=1e-3, max_grad_norm=0.5, desired_kl=0.01)
     elif Algorithm_name == "TD3":
-        agent = TD3(device=device, num_of_action=1 if action_type == "continuous" else num_of_action, action_range=action_range, n_observations=n_observations, hidden_dim=hidden_dim, learning_rate=1e-3, tau=0.005, discount_factor=0.99, buffer_size=10000, batch_size=64, exploration_noise=0.1, target_noise=0.2, target_noise_clip=0.5, policy_update_freq=2)
+        agent = TD3(device=device, num_of_action=1, action_range=action_range, n_observations=n_observations, hidden_dim=hidden_dim, learning_rate=1e-3, tau=0.005, discount_factor=0.99, buffer_size=10000, batch_size=64, exploration_noise=0.1, target_noise=0.2, target_noise_clip=0.5, policy_update_freq=2)
     elif Algorithm_name == "SAC":
-        agent = SAC(device=device, num_of_action=1 if action_type == "continuous" else num_of_action, action_range=action_range, n_observations=n_observations, hidden_dim=hidden_dim, learning_rate=1e-3, alpha_lr=1e-3, tau=0.005, discount_factor=0.99, buffer_size=10000, batch_size=64, init_alpha=0.2, auto_alpha=True)
+        agent = SAC(device=device, num_of_action=1, action_range=action_range, n_observations=n_observations, hidden_dim=hidden_dim, learning_rate=1e-3, alpha_lr=1e-3, tau=0.005, discount_factor=0.99, buffer_size=10000, batch_size=64, init_alpha=0.2, auto_alpha=True)
 
     if Algorithm_name == "DQN" and args_cli.buffer_size is not None:
         run_label = f"{Algorithm_name}_buf{buffer_size}"
